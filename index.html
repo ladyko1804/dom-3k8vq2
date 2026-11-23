@@ -145,7 +145,7 @@ input:focus,textarea:focus{outline:2px solid #cfe1d6;outline-offset:0;border-col
 <body>
 <header>
   <div class="hrow">
-    <div class="brand">Дом <span class="ver">· v3</span></div>
+    <div class="brand">Дом <span class="ver">· v4</span></div>
     <button class="hbtn" id="sndBtn" title="Звук">🔊</button>
   </div>
   <div class="stats" id="stats">—</div>
@@ -612,6 +612,7 @@ function renderHist(){
     '<button class="btn" id="copyDay">Скопировать итоги дня</button>'+
     '<button class="btn" id="copyAll">Копия данных</button>'+
     '<button class="btn" id="pasteAll">Вставить копию</button>'+
+    '<button class="btn" id="pingBtn">Проверить сигнал</button>'+
     '</div><div class="hint">«Копия данных» — перенести дела на другой телефон: нажми здесь, потом на новом открой приложение и нажми «Вставить копию».</div>';
   document.getElementById('main').innerHTML=h;
   renderStats();
@@ -860,6 +861,14 @@ document.addEventListener('click',function(ev){
   if(target.closest&&target.closest('.drow')){
     var row=target.closest('.drow');
     openSheet(row.getAttribute('data-id'));
+    return;
+  }
+  if(target.id==='pingBtn'){
+    if(!('Notification' in window)){toast('Этот браузер не умеет уведомления');return;}
+    if(Notification.permission!=='granted'){toast('Сначала разреши уведомления');askNotify();return;}
+    swPost({type:'ping',title:'Проверка сигнала',text:'Уведомления работают — так придёт сигнал таймера.'});
+    notifyNow('ping','Проверка сигнала','Уведомления работают — так придёт сигнал таймера.');
+    toast('Отправила проверочное уведомление');
     return;
   }
   if(target.id==='copyDay'){

@@ -145,7 +145,7 @@ input:focus,textarea:focus{outline:2px solid #cfe1d6;outline-offset:0;border-col
 <body>
 <header>
   <div class="hrow">
-    <div class="brand">DofaMin <span class="ver">· v5</span></div>
+    <div class="brand">DofaMin <span class="ver">· v6</span></div>
     <button class="hbtn" id="sndBtn" title="Звук">🔊</button>
   </div>
   <div class="stats" id="stats">—</div>
@@ -439,7 +439,14 @@ function askNotify(){
 function renderPermBar(){
   var b=document.getElementById('permBar');
   if(!b)return;
-  if(!('Notification' in window)||Notification.permission==='granted'){b.innerHTML='';return;}
+  if(!('Notification' in window)){b.innerHTML='';return;}
+  var perm='';
+  try{perm=Notification.permission;}catch(e){}
+  if(perm==='granted'){b.innerHTML='';return;}
+  if(perm==='denied'){
+    b.innerHTML='<div class="permbar"><div><b>Уведомления запрещены.</b> Пока запрещены, сигнал слышно только внутри приложения. Включи в Chrome: значок слева от адреса → Разрешения → Уведомления → Разрешить.</div><button id="permHelp">Как</button></div>';
+    return;
+  }
   b.innerHTML='<div class="permbar"><div>Чтобы сигнал был виден и слышен поверх YouTube и других приложений, разреши уведомления.</div><button id="permAllow">Разрешить</button></div>';
 }
 var wake=null;
@@ -838,7 +845,16 @@ document.addEventListener('click',function(ev){
   }
   var rbtn=target.closest?target.closest('[data-rest]'):null;
   if(rbtn){startRest(parseInt(rbtn.getAttribute('data-rest'),10));return;}
-  if(target.id==='permAllow'){askNotify();setTimeout(renderPermBar,600);return;}
+  if(target.id==='permAllow'){
+    askNotify();
+    setTimeout(renderPermBar,800);
+    setTimeout(function(){renderPermBar();toast('Если окошко не появилось — включи уведомления в настройках Chrome');},2500);
+    return;
+  }
+  if(target.id==='permHelp'){
+    try{alert('1) В Chrome нажми значок слева от адреса (ползунки или замочек).\n2) Выбери «Разрешения» (или «Настройки сайта»).\n3) «Уведомления» → «Разрешить».\n4) Вернись в приложение, потяни страницу вниз и нажми «Проверить сигнал» в Итогах.\n\nЕсли значка нет: три точки ⋮ → Настройки → Настройки сайтов → Уведомления → ladyko1804.github.io → Разрешить.');}catch(e){}
+    return;
+  }
   if(target.closest&&target.closest('#addBtn')){
     document.getElementById('sheetAdd').classList.add('open');
     setTimeout(function(){document.getElementById('aTitle').focus();},120);

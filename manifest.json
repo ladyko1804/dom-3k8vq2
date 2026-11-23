@@ -1,19 +1,37 @@
 {
-  "name": "Дом — домашние дела",
-  "short_name": "Дом",
-  "description": "Записать домашнее дело, дать себе минут и увидеть, сколько ушло на самом деле.",
+  "name": "DofaMin — дела и время",
+  "short_name": "DofaMin",
+  "description": "Записать дело, дать себе минут, увидеть сколько ушло на самом деле. С таймером и отдыхом.",
   "lang": "ru",
   "dir": "ltr",
   "start_url": "./?src=pwa",
   "scope": "./",
   "display": "standalone",
-  "display_override": ["fullscreen", "standalone"],
+  "display_override": [
+    "fullscreen",
+    "standalone"
+  ],
   "orientation": "portrait",
   "background_color": "#f4f1ea",
   "theme_color": "#2f7355",
   "icons": [
-    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
   ]
 }

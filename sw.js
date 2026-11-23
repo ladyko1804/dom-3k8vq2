@@ -1,5 +1,5 @@
 /* Дом — кэш приложения и уведомления по таймеру. Имя кэша меняем при каждой правке. */
-var CACHE='dom-v5';
+var CACHE='dom-v6';
 var TCACHE='dom-timers-v1';
 var ASSETS=['./','./index.html','./manifest.json','./icon.svg','./icon-192.png','./icon-512.png'];
 

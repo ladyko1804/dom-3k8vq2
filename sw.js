@@ -1,5 +1,5 @@
 /* Дом — кэш приложения. Меняем имя при каждой правке. */
-var CACHE='dom-v1';
+var CACHE='dom-v2';
 var ASSETS=['./','./index.html','./manifest.json','./icon.svg','./icon-192.png','./icon-512.png'];
 
 self.addEventListener('install',function(e){

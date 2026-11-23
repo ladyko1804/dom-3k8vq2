@@ -43,6 +43,14 @@ main{padding:0 16px 8px}
   background:var(--acc);color:#fff;font-size:17px;font-weight:700;cursor:pointer;
 }
 .add:active{opacity:.85}
+.restrow{display:flex;align-items:center;gap:8px;margin:-2px 0 14px;overflow-x:auto;padding:2px 0 4px}
+.restlab{font-size:12px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.06em;white-space:nowrap}
+.restrow .chip{min-height:38px;padding:7px 13px;font-size:14px;white-space:nowrap}
+.card.rest{border-color:#dcc48c;background:#fdf8ec}
+.card.rest .cd{font-size:44px}
+.card.rest.ringing{border-color:var(--red);animation:pulse 1s infinite}
+.permbar{display:flex;gap:9px;align-items:center;background:#fdf3e0;border:1px solid #ecd9b0;border-radius:12px;padding:9px 12px;margin-top:9px;font-size:13px;color:#7a5a17;line-height:1.3}
+.permbar button{margin-left:auto;border:0;background:#a8761f;color:#fff;border-radius:9px;padding:9px 12px;font-size:13px;font-weight:700;white-space:nowrap}
 .card{
   background:var(--card);border:1px solid var(--line);border-radius:16px;
   padding:13px 14px;margin-bottom:10px;
@@ -137,10 +145,11 @@ input:focus,textarea:focus{outline:2px solid #cfe1d6;outline-offset:0;border-col
 <body>
 <header>
   <div class="hrow">
-    <div class="brand">Дом <span class="ver">· v2</span></div>
+    <div class="brand">Дом <span class="ver">· v3</span></div>
     <button class="hbtn" id="sndBtn" title="Звук">🔊</button>
   </div>
   <div class="stats" id="stats">—</div>
+  <div id="permBar"></div>
 </header>
 
 <main id="main"></main>
@@ -204,7 +213,7 @@ input:focus,textarea:focus{outline:2px solid #cfe1d6;outline-offset:0;border-col
 'use strict';
 
 var KEY='dom_v1';
-var DEF={v:1,sound:true,tasks:[]};
+var DEF={v:1,sound:true,tasks:[],rests:[]};
 var S=load();
 var tab='today';
 var editId=null;
@@ -218,11 +227,12 @@ function load(){
       if(o&&Object.prototype.toString.call(o.tasks)==='[object Array]'){
         if(typeof o.v!=='number')o.v=1;
         if(typeof o.sound!=='boolean')o.sound=true;
+        if(Object.prototype.toString.call(o.rests)!=='[object Array]')o.rests=[];
         return o;
       }
     }
   }catch(e){}
-  return {v:1,sound:true,tasks:[]};
+  return {v:1,sound:true,tasks:[],rests:[]};
 }
 function save(){
   try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){toast('Не удалось сохранить');}
@@ -278,6 +288,59 @@ function byId(id){
   for(var i=0;i<S.tasks.length;i++){if(S.tasks[i].id===id)return S.tasks[i];}
   return null;
 }
+function activeRest(){
+  if(Object.prototype.toString.call(S.rests)!=='[object Array]')S.rests=[];
+  for(var i=0;i<S.rests.length;i++){if(S.rests[i].state==='run')return S.rests[i];}
+  return null;
+}
+function restRow(){
+  var mins=[5,10,15,30,60];
+  return '<div class="restrow"><div class="restlab">Отдых</div>'+mins.map(function(m){
+    return '<button class="chip" data-rest="'+m+'">'+m+' мин</button>';
+  }).join('')+'</div>';
+}
+function cardRest(r){
+  var total=r.min*60000,e=Date.now()-r.start,left=total-e;
+  var w=Math.min(100,total>0?e/total*100:100);
+  return '<div class="card rest'+(r.alarmed?' ringing':'')+'" id="restCard" data-restid="'+r.id+'">'+
+    '<div class="ctop"><div class="title">☕ Отдых '+r.min+' мин</div><div class="plan">по таймеру</div></div>'+
+    '<div class="cdwrap"><div class="cd" id="rcd">'+fmtClock(Math.max(0,left))+'</div>'+
+    '<div class="cdlab">осталось</div></div>'+
+    '<div class="bar"><i id="rbar" style="width:'+w.toFixed(1)+'%"></i></div>'+
+    '<div class="cbot"><button class="btn" data-act="reststop">Хватит отдыха</button>'+
+    '<button class="btn primary" data-act="restplus">+1 мин</button></div></div>';
+}
+function startRest(min){
+  if(!min||min<1)return;
+  unlockAudio();askNotify();
+  var t=runningTask();
+  if(t){
+    t.accMs=el(t);t.state='pause';t.startAt=null;t.alarmed=false;
+    disarmSW('task-'+t.id);stopRing();
+  }
+  var r={id:uid(),min:min,start:Date.now(),day:todayKey(),state:'run',alarmed:false,end:null};
+  S.rests.push(r);save();
+  armSW('rest-'+r.id,'Отдых закончился',r.min+' мин прошло — пора дальше.',r.start+r.min*60000);
+  render();syncWake();
+  toast('Отдых '+r.min+' мин');
+}
+function stopRest(){
+  var r=activeRest();if(!r)return;
+  r.state='stop';r.end=Date.now();r.alarmed=true;
+  disarmSW('rest-'+r.id);stopRing();save();render();
+  toast('Отдых закончен');
+}
+function plusRest(){
+  var r=activeRest();if(!r)return;
+  r.min=r.min+1;r.alarmed=false;stopRing();save();
+  armSW('rest-'+r.id,'Отдых закончился',r.min+' мин прошло — пора дальше.',r.start+r.min*60000);
+  render();
+}
+function restDone(r){
+  r.state='done';r.end=r.start+r.min*60000;r.alarmed=true;
+  disarmSW('rest-'+r.id);save();render();
+  ring('rest-'+r.id,'Отдых закончился',r.min+' мин прошло — пора дальше.');
+}
 
 /* ---------- звук ---------- */
 var AC=null;
@@ -310,46 +373,74 @@ function beep(){
   tone(1180,0.2,0.16,0.3);
   tone(880,0.4,0.24,0.32);
 }
-var alarmInt=null,alarmEnd=0;
+var alarmInt=null,alarmEnd=0,alarmKey=null;
+function vib(p){try{if(navigator.vibrate)navigator.vibrate(p);}catch(e){}}
 function stopRing(){
   if(alarmInt){clearInterval(alarmInt);alarmInt=null;}
-  try{if(navigator.vibrate)navigator.vibrate(0);}catch(e){}
-  var c=document.querySelector('.card.run.ringing');
-  if(c)c.classList.remove('ringing');
+  alarmKey=null;vib(0);
+  var cs=document.querySelectorAll('.card.ringing');
+  for(var i=0;i<cs.length;i++)cs[i].classList.remove('ringing');
 }
-function ring(t){
-  beep();
-  try{if(navigator.vibrate)navigator.vibrate([350,150,350,150,350]);}catch(e){}
-  notify(t);
-  var card=document.getElementById('runCard');
+function aliveKey(key){
+  var id=key.slice(key.indexOf('-')+1);
+  if(key.indexOf('task-')===0){var t=runningTask();return !!(t&&t.id===id);}
+  var r=activeRest();return !!(r&&r.id===id);
+}
+function ring(key,title,text){
+  beep();vib([400,200,400,200,400]);
+  notifyNow(key,title,text);
+  var card=document.getElementById(key.indexOf('task-')===0?'runCard':'restCard');
   if(card)card.classList.add('ringing');
+  alarmKey=key;
   if(alarmInt)clearInterval(alarmInt);
-  alarmEnd=Date.now()+60000;
+  alarmEnd=Date.now()+90000;
   alarmInt=setInterval(function(){
-    if(Date.now()>alarmEnd){stopRing();return;}
-    var rt=runningTask();
-    if(!rt||rt.id!==t.id){stopRing();return;}
-    beep();
-  },2400);
+    if(Date.now()>alarmEnd||!aliveKey(key)){stopRing();return;}
+    beep();vib([300,150,300]);
+  },2500);
 }
-function notify(t){
+function notifyNow(key,title,text){
+  var opts={
+    body:text,tag:'dom-'+key,renotify:true,requireInteraction:true,
+    vibrate:[400,200,400,200,400],icon:'icon-192.png',badge:'icon-192.png',
+    silent:false,lang:'ru'
+  };
   try{
     if(!('Notification' in window)||Notification.permission!=='granted')return;
-    if(!navigator.serviceWorker||!navigator.serviceWorker.ready)return;
-    navigator.serviceWorker.ready.then(function(reg){
-      reg.showNotification('Время вышло: '+t.title,{
-        body:'План '+t.plan+' мин. Пора отмечать, сколько ушло.',
-        tag:'dom-'+t.id,
-        vibrate:[300,150,300,150,300],
-        renotify:true
-      });
-    }).catch(function(){});
+    if(navigator.serviceWorker&&navigator.serviceWorker.ready){
+      navigator.serviceWorker.ready.then(function(reg){return reg.showNotification(title,opts);})
+        .catch(function(){try{new Notification(title,opts);}catch(e){}});
+    }else{
+      try{new Notification(title,opts);}catch(e){}
+    }
   }catch(e){}
 }
+function swPost(msg){
+  try{
+    if(!navigator.serviceWorker)return;
+    if(navigator.serviceWorker.controller){navigator.serviceWorker.controller.postMessage(msg);return;}
+    navigator.serviceWorker.ready.then(function(reg){if(reg.active)reg.active.postMessage(msg);}).catch(function(){});
+  }catch(e){}
+}
+function armSW(key,title,text,endAt){
+  swPost({type:'arm',key:key,title:title,text:text,endAt:endAt});
+}
+function disarmSW(key){swPost({type:'disarm',key:key});}
 function askNotify(){
   try{
-    if('Notification' in window&&Notification.permission==='default')Notification.requestPermission();
+    if(!('Notification' in window))return;
+    if(Notification.permission==='default'){
+      var p=Notification.requestPermission();
+      if(p&&p.then)p.then(function(){render();},function(){render();});
+      else render();
+    }
   }catch(e){}
+}
+function renderPermBar(){
+  var b=document.getElementById('permBar');
+  if(!b)return;
+  if(!('Notification' in window)||Notification.permission==='granted'){b.innerHTML='';return;}
+  b.innerHTML='<div class="permbar"><div>Чтобы сигнал был виден и слышен поверх YouTube и других приложений, разреши уведомления.</div><button id="permAllow">Разрешить</button></div>';
 }
 var wake=null;
 function syncWake(){
@@ -382,7 +473,13 @@ function stats(){
       fact+=(t.fact||0);
     }else plan+=(t.plan||0);
   });
-  return {plan:plan,fact:fact,n:n};
+  var rest=0;
+  S.rests.forEach(function(r){
+    if((r.day||todayKey())!==todayKey())return;
+    if(r.state==='run')rest+=(Date.now()-r.start)/60000;
+    else if(r.end&&r.start)rest+=(r.end-r.start)/60000;
+  });
+  return {plan:plan,fact:fact,n:n,rest:Math.round(rest)};
 }
 function renderStats(){
   var st=stats();
@@ -391,6 +488,7 @@ function renderStats(){
   if(st.fact)parts.push('факт <b>'+fmtMin(st.fact)+'</b>');
   var over=st.fact-st.plan;
   if(st.fact&&over>0)parts.push('<span class="over">+'+fmtMin(over)+'</span>');
+  if(st.rest)parts.push('отдых <b>'+fmtMin(st.rest)+'</b>');
   document.getElementById('stats').innerHTML=parts.join(' · ');
 }
 function plural(n,a,b,c){
@@ -451,6 +549,8 @@ function renderToday(){
   var done=list.filter(function(t){return t.state==='done';})
     .sort(function(a,b){return (b.doneAt||0)-(a.doneAt||0);});
   var h='<button class="add" id="addBtn">+ Дело</button>';
+  var rst=activeRest();
+  if(rst)h+=cardRest(rst);else h+=restRow();
   if(run)h+=cardRun(run);
   rest.forEach(function(t){h+=cardNew(t);});
   if(!run&&!rest.length&&!done.length){
@@ -475,7 +575,14 @@ function dayGroups(){
     var items=g[k].sort(function(a,b){return (a.doneAt||0)-(b.doneAt||0);});
     var plan=0,fact=0;
     items.forEach(function(t){plan+=t.plan||0;fact+=t.fact||0;});
-    return {key:k,items:items,plan:plan,fact:fact};
+    var rmin=0,rn=0;
+    S.rests.forEach(function(r){
+      if((r.day||'')!==k)return;
+      if(r.state==='run')return;
+      if(!r.start||!r.end)return;
+      rmin+=(r.end-r.start)/60000;rn++;
+    });
+    return {key:k,items:items,plan:plan,fact:fact,rest:Math.round(rmin),restN:rn};
   });
 }
 function renderHist(){
@@ -497,6 +604,7 @@ function renderHist(){
           '<span class="dm">'+t.plan+' / '+t.fact+
           (d>0?' <span class="neg">+'+d+'</span>':'')+'</span></div>';
       });
+      if(g.restN)h+='<div class="drow"><span class="dt">☕ отдых</span><span class="dm">'+g.restN+' раз · '+g.rest+' мин</span></div>';
       h+='</div>';
     });
   }
@@ -509,6 +617,7 @@ function renderHist(){
   renderStats();
 }
 function render(){
+  renderPermBar();
   if(tab==='today')renderToday();else renderHist();
   document.getElementById('tabToday').className=tab==='today'?'on':'';
   document.getElementById('tabHist').className=tab==='hist'?'on':'';
@@ -519,19 +628,33 @@ function render(){
 /* ---------- тик таймера ---------- */
 setInterval(function(){
   var t=runningTask();
-  if(!t)return;
-  var cd=document.getElementById('cd');
-  if(!cd)return;
-  var e=el(t),total=t.plan*60000,rem=total-e;
-  cd.textContent=fmtClock(Math.abs(rem));
-  if(rem<0){cd.className='cd over';}else{cd.className='cd';}
-  var lab=document.getElementById('cdlab');
-  if(lab)lab.textContent=rem<0?'просрочено':'осталось';
-  var bar=document.getElementById('cdbar');
-  if(bar)bar.style.width=Math.min(100,total>0?e/total*100:100).toFixed(1)+'%';
-  if(rem<=0&&!t.alarmed){
-    t.alarmed=true;save();ring(t);
-    renderStats();
+  if(t){
+    var e=el(t),total=t.plan*60000,rem=total-e;
+    if(rem<=0&&!t.alarmed){
+      t.alarmed=true;save();
+      ring('task-'+t.id,'Время вышло: '+t.title,'План '+t.plan+' мин. Отметь, сколько ушло на самом деле.');
+      renderStats();
+    }
+    var cd=document.getElementById('cd');
+    if(cd){
+      cd.textContent=fmtClock(Math.abs(rem));
+      cd.className=rem<0?'cd over':'cd';
+      var lab=document.getElementById('cdlab');
+      if(lab)lab.textContent=rem<0?'просрочено':'осталось';
+      var bar=document.getElementById('cdbar');
+      if(bar)bar.style.width=Math.min(100,total>0?e/total*100:100).toFixed(1)+'%';
+    }
+  }
+  var r=activeRest();
+  if(r){
+    var left=r.start+r.min*60000-Date.now();
+    if(left<=0&&!r.alarmed){restDone(r);return;}
+    var rcd=document.getElementById('rcd');
+    if(rcd){
+      rcd.textContent=fmtClock(Math.max(0,left));
+      var rb=document.getElementById('rbar');
+      if(rb)rb.style.width=Math.max(0,Math.min(100,(1-left/(r.min*60000))*100)).toFixed(1)+'%';
+    }
   }
 },500);
 
@@ -547,24 +670,31 @@ function startTask(id){
   if(!t)return;
   if(!t.day)t.day=todayKey();
   t.state='run';t.startAt=Date.now();t.alarmed=false;
-  save();render();syncWake();
+  save();
+  armSW('task-'+t.id,'Время вышло: '+t.title,'План '+t.plan+' мин. Отметь, сколько ушло на самом деле.',
+    Date.now()+Math.max(0,t.plan*60000-(t.accMs||0)));
+  render();syncWake();
 }
 function pauseTask(id){
   var t=byId(id);
   if(!t)return;
   t.accMs=el(t);t.state='pause';t.startAt=null;t.alarmed=false;
-  stopRing();save();render();syncWake();
+  disarmSW('task-'+t.id);stopRing();save();render();syncWake();
 }
 function plusFive(id){
   var t=byId(id);
   if(!t)return;
-  t.plan=(t.plan||0)+5;t.alarmed=false;stopRing();save();render();
+  t.plan=(t.plan||0)+5;t.alarmed=false;stopRing();save();
+  armSW('task-'+t.id,'Время вышло: '+t.title,'План '+t.plan+' мин. Отметь, сколько ушло на самом деле.',
+    Date.now()+Math.max(0,t.plan*60000-el(t)));
+  render();
   toast('План теперь '+t.plan+' мин');
 }
 function deleteTask(id){
   var t=byId(id);
   if(!t)return;
   if(!confirm('Удалить «'+t.title+'»?'))return;
+  disarmSW('task-'+id);
   S.tasks=S.tasks.filter(function(x){return x.id!==id;});
   stopRing();save();render();
   toast('Удалено');
@@ -587,7 +717,7 @@ function openSheet(id){
   document.getElementById('sheetT').classList.add('open');
 }
 function buildReasonChips(){
-  var chips=['отвлекалась','не рассчитала время','делала не только это','не было нужного','устала','растянула отдых'];
+  var chips=['неверно оценила объём','отвлекалась','делала не только это','не было нужного','устала','растянула отдых'];
   document.getElementById('tChips').innerHTML=chips.map(function(c){
     return '<button class="chip" data-r="'+esc(c)+'">'+esc(c)+'</button>';
   }).join('');
@@ -619,7 +749,7 @@ function saveTask(){
     t.state='done';t.fact=fact;t.accMs=fact*60000;t.startAt=null;
     t.doneAt=t.doneAt||Date.now();t.alarmed=false;
     t.day=todayKey();
-    stopRing();
+    disarmSW('task-'+t.id);stopRing();
   }else if(t.state!=='done'){
     if(t.accMs>plan*60000)t.accMs=0;
   }
@@ -673,6 +803,7 @@ function dayText(){
     if(t.note)out+='; коммент: '+t.note;
     out+='\n';
   });
+  if(st.rest)out+='отдых за день: '+st.rest+' мин\n';
   if(!list.length)out+='записанных дел пока нет\n';
   return out;
 }
@@ -687,13 +818,16 @@ function toast(msg){
 /* ---------- события ---------- */
 document.addEventListener('click',function(ev){
   var target=ev.target;
+  if(alarmInt)stopRing();
   var btn=target.closest?target.closest('[data-act]'):null;
   if(btn){
     var card=btn.closest('.card');
-    var id=card?card.getAttribute('data-id'):null;
+    var id=card?(card.getAttribute('data-id')||card.getAttribute('data-restid')):null;
     var act=btn.getAttribute('data-act');
-    if(!id)return;
     ev.stopPropagation();
+    if(act==='reststop'){stopRest();return;}
+    if(act==='restplus'){plusRest();return;}
+    if(!id)return;
     if(act==='start')startTask(id);
     else if(act==='pause')pauseTask(id);
     else if(act==='plus5')plusFive(id);
@@ -701,6 +835,9 @@ document.addEventListener('click',function(ev){
     else if(act==='open')openSheet(id);
     return;
   }
+  var rbtn=target.closest?target.closest('[data-rest]'):null;
+  if(rbtn){startRest(parseInt(rbtn.getAttribute('data-rest'),10));return;}
+  if(target.id==='permAllow'){askNotify();setTimeout(renderPermBar,600);return;}
   if(target.closest&&target.closest('#addBtn')){
     document.getElementById('sheetAdd').classList.add('open');
     setTimeout(function(){document.getElementById('aTitle').focus();},120);
@@ -776,7 +913,18 @@ document.addEventListener('visibilitychange',function(){
   if(document.visibilityState==='visible'){
     unlockAudio();
     var t=runningTask();
-    if(t){t.alarmed=false;save();render();}
+    if(t){
+      t.alarmed=false;save();
+      armSW('task-'+t.id,'Время вышло: '+t.title,'План '+t.plan+' мин. Отметь, сколько ушло на самом деле.',
+        Date.now()+Math.max(0,t.plan*60000-el(t)));
+      render();
+    }
+    var r=activeRest();
+    if(r){
+      r.alarmed=false;save();
+      armSW('rest-'+r.id,'Отдых закончился',r.min+' мин прошло — пора дальше.',r.start+r.min*60000);
+      render();
+    }
   }
 });
 

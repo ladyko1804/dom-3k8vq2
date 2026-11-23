@@ -137,7 +137,7 @@ input:focus,textarea:focus{outline:2px solid #cfe1d6;outline-offset:0;border-col
 <body>
 <header>
   <div class="hrow">
-    <div class="brand">Дом <span class="ver">· v1</span></div>
+    <div class="brand">Дом <span class="ver">· v2</span></div>
     <button class="hbtn" id="sndBtn" title="Звук">🔊</button>
   </div>
   <div class="stats" id="stats">—</div>
@@ -369,7 +369,7 @@ function syncWake(){
 function todayTasks(){
   var tk=todayKey();
   return S.tasks.filter(function(t){
-    return t.day===tk||t.state==='run'||t.state==='pause';
+    return t.state!=='done'||t.day===tk;
   });
 }
 function stats(){
@@ -406,6 +406,7 @@ function cardNew(t){
     '<div class="ctop"><div class="title" data-act="open">'+esc(t.title)+'</div>'+
     '<div class="plan">план '+t.plan+' мин</div></div>';
   if(hasTime&&rem>0)html+='<div class="why">на паузе, осталось '+fmtMin(rem/60000)+'</div>';
+  if(t.day&&t.day!==todayKey())html+='<div class="why">висит с прошлого дня</div>';
   html+='<div class="cbot">'+
     '<button class="btn primary" data-act="start">▶ '+(hasTime?'Продолжить':'Старт')+'</button>'+
     '<button class="btn" data-act="open">Закончила</button>'+
@@ -617,7 +618,7 @@ function saveTask(){
   if(fact&&fact>0){
     t.state='done';t.fact=fact;t.accMs=fact*60000;t.startAt=null;
     t.doneAt=t.doneAt||Date.now();t.alarmed=false;
-    if(!t.day)t.day=todayKey();
+    t.day=todayKey();
     stopRing();
   }else if(t.state!=='done'){
     if(t.accMs>plan*60000)t.accMs=0;

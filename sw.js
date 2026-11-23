@@ -1,5 +1,5 @@
 /* Дом — кэш приложения и уведомления по таймеру. Имя кэша меняем при каждой правке. */
-var CACHE='dom-v6';
+var CACHE='dom-v7';
 var TCACHE='dom-timers-v1';
 var ASSETS=['./','./index.html','./manifest.json','./icon.svg','./icon-192.png','./icon-512.png'];
 
@@ -61,6 +61,20 @@ function fire(key){
   if(handles[key]){clearTimeout(handles[key]);delete handles[key];}
   persist();
   show(t);
+  repeat(t,1);
+}
+/* если приложение так и не открыли — повторить сигнал ещё дважды */
+function repeat(t,n){
+  if(n>2)return;
+  setTimeout(function(){
+    self.clients.matchAll({type:'window',includeUncontrolled:true}).then(function(list){
+      var seen=false;
+      for(var i=0;i<list.length;i++){if(list[i].visibilityState==='visible')seen=true;}
+      if(seen)return;
+      show({key:t.key+'-r'+n,title:t.title,text:t.text});
+      repeat(t,n+1);
+    }).catch(function(){});
+  },35000*n);
 }
 function show(t){
   return self.registration.showNotification(t.title||'Таймер',{
@@ -68,7 +82,7 @@ function show(t){
     tag:'dom-'+t.key,
     renotify:true,
     requireInteraction:true,
-    vibrate:[400,200,400,200,400],
+    vibrate:[500,250,500,250,500,250,500],
     icon:'icon-192.png',
     badge:'icon-192.png',
     lang:'ru',
